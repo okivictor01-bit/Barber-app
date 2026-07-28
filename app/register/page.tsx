@@ -1,0 +1,96 @@
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
+
+export default function RegisterPage() {
+  const router = useRouter();
+  const supabase = createClient();
+  const [form, setForm] = useState({
+    business_name: '',
+    full_name: '',
+    email: '',
+    phone: '',
+    password: '',
+  });
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  function update(key: string, value: string) {
+    setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    const res = await fetch('/api/onboarding/register-business', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      setError(data.error ?? 'Registration failed');
+      setLoading(false);
+      return;
+    }
+
+    // Now sign the owner in
+    const { error: signInErr } = await supabase.auth.signInWithPassword({
+      email: form.email,
+      password: form.password,
+    });
+
+    if (signInErr) {
+      setError(signInErr.message);
+      setLoading(false);
+      return;
+    }
+
+    router.push('/dashboard/admin');
+    router.refresh();
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center px-4 py-10">
+      <form onSubmit={handleSubmit} className="card w-full max-w-md space-y-4">
+        <h1 className="text-xl font-semibold text-center">Register your barbing business</h1>
+        {error && <p className="text-sm text-red-600">{error}</p>}
+
+        <div>
+          <label className="text-sm font-medium">Business name</label>
+          <input required className="input mt-1" value={form.business_name}
+            onChange={(e) => update('business_name', e.target.value)} />
+        </div>
+        <div>
+          <label className="text-sm font-medium">Your full name</label>
+          <input required className="input mt-1" value={form.full_name}
+            onChange={(e) => update('full_name', e.target.value)} />
+        </div>
+        <div>
+          <label className="text-sm font-medium">Email</label>
+          <input type="email" required className="input mt-1" value={form.email}
+            onChange={(e) => update('email', e.target.value)} />
+        </div>
+        <div>
+          <label className="text-sm font-medium">Phone</label>
+          <input className="input mt-1" value={form.phone}
+            onChange={(e) => update('phone', e.target.value)} />
+        </div>
+        <div>
+          <label className="text-sm font-medium">Password</label>
+          <input type="password" required minLength={6} className="input mt-1" value={form.password}
+            onChange={(e) => update('password', e.target.value)} />
+        </div>
+
+        <button type="submit" disabled={loading} className="btn-primary w-full">
+          {loading ? 'Creating your business…' : 'Create business & continue'}
+        </button>
+      </form>
+    </div>
+  );
+}

@@ -1,0 +1,68 @@
+import { createClient } from '@/lib/supabase/server';
+import { onboardCustomer, removeStaffOrCustomer } from '@/lib/actions';
+
+export default async function CustomersPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: profile } = await supabase.from('profiles').select('*').eq('id', user!.id).single();
+
+  const { data: bcRows } = await supabase
+    .from('business_customers')
+    .select('*, profiles:customer_id(full_name, phone, is_active)')
+    .eq('business_id', profile!.business_id)
+    .order('created_at', { ascending: false });
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-2xl font-semibold">Customers</h1>
+
+      <div className="card max-w-lg">
+        <h2 className="font-semibold mb-4">Onboard a new customer</h2>
+        <form action={onboardCustomer} className="space-y-3">
+          <input name="full_name" placeholder="Full name" required className="input" />
+          <input name="email" type="email" placeholder="Email" required className="input" />
+          <input name="phone" placeholder="Phone" className="input" />
+          <input name="password" type="password" placeholder="Temporary password" required minLength={6} className="input" />
+          <button type="submit" className="btn-primary">Add customer</button>
+        </form>
+      </div>
+
+      <div className="card">
+        <h2 className="font-semibold mb-4">Your customers</h2>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-neutral-500 border-b">
+              <th className="py-2 pr-4">Name</th>
+              <th className="py-2 pr-4">Phone</th>
+              <th className="py-2 pr-4">Paid visits</th>
+              <th className="py-2 pr-4">Free tickets earned</th>
+              <th className="py-2 pr-4"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {(bcRows ?? []).map((r: any) => (
+              <tr key={r.id} className="border-b last:border-0">
+                <td className="py-2 pr-4">{r.profiles?.full_name}</td>
+                <td className="py-2 pr-4">{r.profiles?.phone}</td>
+                <td className="py-2 pr-4">{r.paid_transaction_count} <span className="text-neutral-400">(every 3rd is free)</span></td>
+                <td className="py-2 pr-4">{r.free_tickets_earned}</td>
+                <td className="py-2 pr-4">
+                  <form action={removeStaffOrCustomer.bind(null, r.customer_id)}>
+                    <button className="text-red-600 text-xs hover:underline">Remove</button>
+                  </form>
+                </td>
+              </tr>
+            ))}
+            {(!bcRows || bcRows.length === 0) && (
+              <tr>
+                <td colSpan={5} className="py-6 text-center text-neutral-400">No customers yet.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
