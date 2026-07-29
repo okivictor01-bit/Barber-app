@@ -26,33 +26,52 @@ export default function RegisterPage() {
     setLoading(true);
     setError(null);
 
-    const res = await fetch('/api/onboarding/register-business', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    });
-    const data = await res.json();
+    try {
+      const controller = new AbortController();
+      const abortTimer = setTimeout(() => controller.abort(), 25000);
 
-    if (!res.ok) {
-      setError(data.error ?? 'Registration failed');
+      const res = await fetch('/api/onboarding/register-business', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+        signal: controller.signal,
+      });
+      clearTimeout(abortTimer);
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error ?? 'Registration failed');
+        setLoading(false);
+        return;
+      }
+
+      // Now sign the owner in
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Your business was created, but signing you in is taking too long. Try signing in manually below.')), 20000)
+      );
+
+      const { error: signInErr } = await Promise.race([
+        supabase.auth.signInWithPassword({ email: form.email, password: form.password }),
+        timeout,
+      ]);
+
+      if (signInErr) {
+        setError(signInErr.message);
+        setLoading(false);
+        return;
+      }
+
+      router.push('/dashboard/admin');
+      router.refresh();
+    } catch (err: any) {
+      setError(
+        err?.name === 'AbortError'
+          ? 'The request took too long. Check your connection — your business may or may not have been created; try signing in below to check.'
+          : err?.message ?? 'Something went wrong. Check your connection and try again.'
+      );
       setLoading(false);
-      return;
     }
-
-    // Now sign the owner in
-    const { error: signInErr } = await supabase.auth.signInWithPassword({
-      email: form.email,
-      password: form.password,
-    });
-
-    if (signInErr) {
-      setError(signInErr.message);
-      setLoading(false);
-      return;
-    }
-
-    router.push('/dashboard/admin');
-    router.refresh();
   }
 
   return (

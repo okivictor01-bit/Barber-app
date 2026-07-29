@@ -17,16 +17,29 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    try {
+      // Give slow/flaky connections a real chance, but don't hang forever with no feedback
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('This is taking too long — check your connection and try again.')), 20000)
+      );
 
-    if (error) {
-      setError(error.message);
+      const { error } = await Promise.race([
+        supabase.auth.signInWithPassword({ email, password }),
+        timeout,
+      ]);
+
+      if (error) {
+        setError(error.message);
+        setLoading(false);
+        return;
+      }
+
+      router.push('/dashboard');
+      router.refresh();
+    } catch (err: any) {
+      setError(err?.message ?? 'Something went wrong. Check your connection and try again.');
       setLoading(false);
-      return;
     }
-
-    router.push('/dashboard');
-    router.refresh();
   }
 
   return (
