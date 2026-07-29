@@ -1,11 +1,16 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "barbing-app",
+  "name": "barber-app",
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-01-01",
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
+  },
+  "vars": {
+    "NEXT_PUBLIC_SUPABASE_URL": "https://dssyzemzuswtoovsoyot.supabase.co",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRzc3l6ZW16dXN3dG9vdnNveW90Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyNTU2NjgsImV4cCI6MjEwMDgzMTY2OH0.WbO-Ju6SHumEI4P65o8S7I4vZ8FryQr9M9wi19npvR0",
+    "NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY": "pk_test_ab5b5de0c2432ac4d131524c44ba74d2bb7de6d9"
   }
 }
