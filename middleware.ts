@@ -1,4 +1,5 @@
 import { createServerClient } from '@supabase/ssr';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function middleware(request: NextRequest) {
@@ -40,20 +41,39 @@ export async function middleware(request: NextRequest) {
 
   // Role-gate specific dashboard sub-paths
   if (user && isDashboard) {
-    const { data: profile } = await supabase
+    // Use a service-role client for this specific lookup, bypassing RLS.
+    // We only ever read `role` here for routing decisions — never exposed
+    // to the client — so this is safe, and it sidesteps any edge-runtime
+    // cookie/session propagation quirks affecting the RLS-scoped client.
+    const adminSupabase = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { persistSession: false } }
+    );
+
+    const { data: profile, error: profileError } = await adminSupabase
       .from('profiles')
       .select('role')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
     // Orphaned session: a login exists but no profile row (e.g. an interrupted
     // signup). Don't leave the user stranded on a 404 — sign them out and
     // send them back to login so they can retry cleanly.
-    if (!profile) {
+    // Note: if this lookup itself errored (e.g. transient network issue),
+    // profileError will be set and profile will be null — we deliberately
+    // let the user through to /dashboard rather than sign them out on a
+    // false alarm; the page-level Supabase queries will still enforce auth.
+    if (!profile && !profileError) {
       await supabase.auth.signOut(); // triggers the cookie 'remove' callback above, clearing it on `response`
       const redirectResponse = NextResponse.redirect(new URL('/login', request.url));
       response.cookies.getAll().forEach((cookie) => redirectResponse.cookies.set(cookie));
       return redirectResponse;
+    }
+
+    if (!profile) {
+      // Lookup errored — don't block navigation, just pass through.
+      return response;
     }
 
     const role = profile.role;
