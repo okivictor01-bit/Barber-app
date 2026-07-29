@@ -46,7 +46,17 @@ export async function middleware(request: NextRequest) {
       .eq('id', user.id)
       .single();
 
-    const role = profile?.role;
+    // Orphaned session: a login exists but no profile row (e.g. an interrupted
+    // signup). Don't leave the user stranded on a 404 — sign them out and
+    // send them back to login so they can retry cleanly.
+    if (!profile) {
+      await supabase.auth.signOut(); // triggers the cookie 'remove' callback above, clearing it on `response`
+      const redirectResponse = NextResponse.redirect(new URL('/login', request.url));
+      response.cookies.getAll().forEach((cookie) => redirectResponse.cookies.set(cookie));
+      return redirectResponse;
+    }
+
+    const role = profile.role;
     const roleHome: Record<string, string> = {
       super_admin: '/dashboard/super-admin',
       admin: '/dashboard/admin',
