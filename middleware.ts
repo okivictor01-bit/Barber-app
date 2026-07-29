@@ -38,58 +38,47 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
-  // Role-gate specific dashboard sub-paths. Wrapped defensively — this is a
-  // routing convenience, not a security boundary (every page's own Supabase
-  // queries are protected by RLS regardless), so if anything here errors
-  // unexpectedly, we let the request through rather than crash the app.
+  // Role-gate specific dashboard sub-paths.
+  // Role is read directly from the user's auth metadata (set server-side at
+  // account-creation time — see lib/actions.ts / register-business route),
+  // NOT queried from the `profiles` table. This avoids an extra database
+  // round-trip inside Middleware's restricted Edge Runtime entirely, which
+  // was proving unreliable. `profiles` remains the source of truth for
+  // everything else the app displays.
   if (user && isDashboard) {
-    try {
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .maybeSingle();
+    const role = (user.app_metadata as any)?.role as string | undefined;
 
-      // Orphaned session: a login exists but no profile row (e.g. an
-      // interrupted signup). Don't leave the user stranded on a 404 — sign
-      // them out and send them back to login so they can retry cleanly.
-      // If the lookup itself errored (vs. cleanly finding no row), don't
-      // treat that as "no profile" — just let the request through so a
-      // transient error can't wrongly sign someone out.
-      if (!profile && !error) {
-        await supabase.auth.signOut();
-        const redirectResponse = NextResponse.redirect(new URL('/login', request.url));
-        response.cookies.getAll().forEach((cookie) => redirectResponse.cookies.set(cookie));
-        return redirectResponse;
-      }
+    // No role in metadata: either a genuinely orphaned/legacy account, or
+    // metadata hasn't propagated to this session yet. Don't dead-end —
+    // send back to login so they can retry cleanly.
+    if (!role) {
+      await supabase.auth.signOut();
+      const redirectResponse = NextResponse.redirect(new URL('/login?issue=no-role', request.url));
+      response.cookies.getAll().forEach((cookie) => redirectResponse.cookies.set(cookie));
+      return redirectResponse;
+    }
 
-      if (profile) {
-        const role = profile.role;
-        const roleHome: Record<string, string> = {
-          super_admin: '/dashboard/super-admin',
-          admin: '/dashboard/admin',
-          barber: '/dashboard/barber',
-          customer: '/dashboard/customer',
-        };
+    const roleHome: Record<string, string> = {
+      super_admin: '/dashboard/super-admin',
+      admin: '/dashboard/admin',
+      barber: '/dashboard/barber',
+      customer: '/dashboard/customer',
+    };
 
-        const roleSegmentMap: Record<string, string> = {
-          '/dashboard/super-admin': 'super_admin',
-          '/dashboard/admin': 'admin',
-          '/dashboard/barber': 'barber',
-          '/dashboard/customer': 'customer',
-        };
+    const roleSegmentMap: Record<string, string> = {
+      '/dashboard/super-admin': 'super_admin',
+      '/dashboard/admin': 'admin',
+      '/dashboard/barber': 'barber',
+      '/dashboard/customer': 'customer',
+    };
 
-        const matchedSegment = Object.keys(roleSegmentMap).find((seg) => path.startsWith(seg));
-        if (matchedSegment && roleSegmentMap[matchedSegment] !== role) {
-          return NextResponse.redirect(new URL(roleHome[role] ?? '/login', request.url));
-        }
+    const matchedSegment = Object.keys(roleSegmentMap).find((seg) => path.startsWith(seg));
+    if (matchedSegment && roleSegmentMap[matchedSegment] !== role) {
+      return NextResponse.redirect(new URL(roleHome[role] ?? '/login', request.url));
+    }
 
-        if (path === '/dashboard') {
-          return NextResponse.redirect(new URL(roleHome[role], request.url));
-        }
-      }
-    } catch {
-      return response;
+    if (path === '/dashboard') {
+      return NextResponse.redirect(new URL(roleHome[role] ?? '/login', request.url));
     }
   }
 

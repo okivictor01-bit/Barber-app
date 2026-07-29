@@ -88,6 +88,11 @@ export async function onboardBarber(formData: FormData) {
     throw new Error(profileErr.message);
   }
 
+  // Stamp the role onto the auth account — middleware reads this directly.
+  await admin.auth.admin.updateUserById(userRes.user.id, {
+    app_metadata: { role: 'barber', business_id: profile.business_id },
+  });
+
   revalidatePath('/dashboard/admin/barbers');
 }
 
@@ -101,9 +106,6 @@ export async function onboardCustomer(formData: FormData) {
   const temp_password = String(formData.get('password'));
 
   const admin = createAdminClient();
-
-  // Customer might already exist (onboarded at another business) — check first
-  const { data: existing } = await admin.from('profiles').select('id').eq('id', email).maybeSingle();
 
   let customerId: string;
 
@@ -127,6 +129,11 @@ export async function onboardCustomer(formData: FormData) {
       full_name,
       phone,
       created_by: profile.id,
+    });
+
+    // Stamp the role onto the auth account — middleware reads this directly.
+    await admin.auth.admin.updateUserById(customerId, {
+      app_metadata: { role: 'customer' },
     });
   }
 

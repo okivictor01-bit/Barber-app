@@ -51,5 +51,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: profileErr.message }, { status: 400 });
   }
 
+  // 4. Stamp the role onto the auth account itself — middleware reads this
+  // directly (no database round-trip) to decide which dashboard to route to.
+  const { error: metaErr } = await admin.auth.admin.updateUserById(userId, {
+    app_metadata: { role: 'admin', business_id: business.id },
+  });
+  if (metaErr) {
+    return NextResponse.json({ error: metaErr.message }, { status: 400 });
+  }
+
   return NextResponse.json({ success: true, business_id: business.id });
 }
