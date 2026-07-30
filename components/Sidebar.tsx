@@ -14,7 +14,7 @@ export default function Sidebar({
     <aside className="w-56 shrink-0 bg-white border-r border-neutral-200 min-h-screen p-4 flex flex-col">
       <div className="mb-6">
         <p className="font-bold text-lg text-brand-700">BarbFlow</p>
-        {businessName && <p className="text-sm font-medium text-neutral-800 mt-1">{businessName}</p>}
+        {businessName && <p className="text-sm font-bold text-neutral-800 mt-1">{businessName}</p>}
         <p className="text-xs text-neutral-500 capitalize">{role.replace('_', ' ')}</p>
       </div>
       <nav className="flex-1 space-y-1">
