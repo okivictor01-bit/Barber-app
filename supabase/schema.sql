@@ -38,7 +38,7 @@ create table businesses (
   phone text,
   paystack_subaccount_code text, -- optional: for split payments at Paystack level
   default_price numeric(12,2) not null default 3000.00, -- standard haircut price (owner-editable)
-  commission_rate numeric(5,2) not null default 15.00, -- platform % (overridable by super_admin)
+  commission_rate numeric(5,2) not null default 10.00, -- platform % (overridable by super_admin)
   loyalty_interval int not null default 3, -- every N paid transactions => 1 free ticket (owner-editable)
   is_active boolean not null default true,
   created_at timestamptz not null default now()
@@ -128,7 +128,7 @@ create table expenses (
 -- =========================================================
 create table platform_settings (
   id int primary key default 1,
-  default_commission_rate numeric(5,2) not null default 15.00,
+  default_commission_rate numeric(5,2) not null default 10.00,
   loyalty_interval int not null default 3, -- every N paid transactions => 1 free ticket
   updated_at timestamptz not null default now(),
   constraint single_row check (id = 1)

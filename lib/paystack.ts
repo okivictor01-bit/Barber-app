@@ -74,7 +74,7 @@ export async function verifyWebhookSignature(rawBody: string, signature: string 
 }
 
 /** Split amount (Naira) into platform fee + business amount given a commission % (default 15). */
-export function splitAmount(amountNaira: number, commissionRate = 15) {
+export function splitAmount(amountNaira: number, commissionRate = 10) {
   const platform_fee = Math.round(amountNaira * (commissionRate / 100) * 100) / 100;
   const business_amount = Math.round((amountNaira - platform_fee) * 100) / 100;
   return { platform_fee, business_amount };

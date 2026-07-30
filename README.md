@@ -1,6 +1,6 @@
 # BarbFlow — Barbing Business Management Platform
 
-A multi-tenant web app for running a barbing business: super admin, business owners (admin), barbers, and customers — with Paystack payments, ticket-based haircut approvals, an automatic loyalty reward (every 3rd paid visit is free), and an 85/15 revenue split between business owners and the platform.
+A multi-tenant web app for running a barbing business: super admin, business owners (admin), barbers, and customers — with Paystack payments, ticket-based haircut approvals, an automatic loyalty reward (every 3rd paid visit is free), and a 90/10 revenue split between business owners and the platform (default, editable per business).
 
 **Stack:** Next.js 14 (App Router) · Supabase (Postgres + Auth + RLS) · Paystack · Cloudflare Pages · GitHub
 
@@ -17,7 +17,7 @@ A multi-tenant web app for running a barbing business: super admin, business own
 
 **Payment flow:** Customer pays on Paystack → webhook confirms → a `transactions` row is marked `success` → a Postgres trigger auto-creates a `pending` ticket and increments the customer's loyalty counter (every 3rd triggers a free ticket) → customer clicks **Submit ticket** → it appears on the owner/barber dashboard → they approve it → barber gives the haircut → mark completed.
 
-**Money split:** Every successful transaction is split at the database level: `platform_fee` (15% default, editable per business by the super admin) and `business_amount` (the rest). The Finance tab totals these automatically.
+**Money split:** Every successful transaction is split at the database level: `platform_fee` (10% default, editable per business by the super admin) and `business_amount` (the rest). The Finance tab totals these automatically.
 
 ---
 
