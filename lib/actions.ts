@@ -233,13 +233,13 @@ export async function submitTicket(ticketId: string) {
 
 export async function approveTicket(ticketId: string) {
   const { supabase, profile } = await requireProfile();
-  if (!['admin', 'barber'].includes(profile.role)) throw new Error('Not authorized');
+  if (!['admin', 'barber', 'manager'].includes(profile.role)) throw new Error('Not authorized');
 
   const { error } = await supabase
     .from('tickets')
     .update({
       status: 'approved',
-      barber_id: profile.role === 'barber' ? profile.id : null,
+      barber_id: profile.role === 'barber' || profile.role === 'manager' ? profile.id : null,
       approved_by: profile.id,
       approved_at: new Date().toISOString(),
     })
@@ -249,11 +249,12 @@ export async function approveTicket(ticketId: string) {
 
   revalidatePath('/dashboard/admin/tickets');
   revalidatePath('/dashboard/barber/tickets');
+  revalidatePath('/dashboard/manager/tickets');
 }
 
 export async function completeTicket(ticketId: string) {
   const { supabase, profile } = await requireProfile();
-  if (!['admin', 'barber'].includes(profile.role)) throw new Error('Not authorized');
+  if (!['admin', 'barber', 'manager'].includes(profile.role)) throw new Error('Not authorized');
 
   const { error } = await supabase
     .from('tickets')
@@ -264,6 +265,7 @@ export async function completeTicket(ticketId: string) {
 
   revalidatePath('/dashboard/admin/tickets');
   revalidatePath('/dashboard/barber/tickets');
+  revalidatePath('/dashboard/manager/tickets');
 }
 
 // ---------- EXPENSES ----------

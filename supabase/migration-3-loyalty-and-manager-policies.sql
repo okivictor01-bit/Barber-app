@@ -52,9 +52,9 @@ end;
 $$ language plpgsql security definer;
 
 -- =========================================================
--- 3. Extend relevant RLS policies to include the new 'manager' role
---    (managers can onboard/view customers and submit expenses, but
---    do NOT get ticket-approval access — that stays admin/barber only)
+-- 3. Extend relevant RLS policies to include the new 'manager' role.
+--    Managers can onboard/view customers, approve tickets, and submit
+--    expenses (which still require owner approval).
 -- =========================================================
 
 drop policy if exists "owner views business staff/customers" on profiles;
@@ -63,6 +63,10 @@ create policy "owner views business staff/customers" on profiles
     my_role() in ('admin','barber','manager')
     and business_id = my_business_id()
   );
+
+drop policy if exists "business staff manage tickets" on tickets;
+create policy "business staff manage tickets" on tickets
+  for all using (business_id = my_business_id() and my_role() in ('admin','barber','manager'));
 
 drop policy if exists "business staff view/manage own customers" on business_customers;
 create policy "business staff view/manage own customers" on business_customers

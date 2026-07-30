@@ -274,7 +274,7 @@ create policy "super_admin all tickets" on tickets
   for all using (my_role() = 'super_admin');
 
 create policy "business staff manage tickets" on tickets
-  for all using (business_id = my_business_id() and my_role() in ('admin','barber'));
+  for all using (business_id = my_business_id() and my_role() in ('admin','barber','manager'));
 
 create policy "customer view/create own tickets" on tickets
   for select using (customer_id = auth.uid());
