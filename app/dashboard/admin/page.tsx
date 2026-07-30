@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import { updateBusinessPrice } from '@/lib/actions';
+import { updateBusinessPrice, updateLoyaltyInterval } from '@/lib/actions';
 
 export default async function FinanceOverviewPage() {
   const supabase = await createClient();
@@ -12,7 +12,7 @@ export default async function FinanceOverviewPage() {
 
   const { data: business } = await supabase
     .from('businesses')
-    .select('default_price, commission_rate')
+    .select('default_price, commission_rate, loyalty_interval')
     .eq('id', businessId)
     .single();
 
@@ -40,10 +40,10 @@ export default async function FinanceOverviewPage() {
       <h1 className="text-2xl font-semibold">Finance Overview</h1>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Money In (your 85%)" value={moneyIn} tone="green" />
+        <StatCard label={`Money In (your ${100 - Number(business?.commission_rate ?? 15)}%)`} value={moneyIn} tone="green" />
         <StatCard label="Money Out (expenses)" value={moneyOut} tone="red" />
         <StatCard label={profit >= 0 ? 'Profit' : 'Loss'} value={profit} tone={profit >= 0 ? 'green' : 'red'} />
-        <StatCard label="Platform Fees Paid (15%)" value={platformFees} tone="neutral" />
+        <StatCard label={`Platform Fees Paid (${business?.commission_rate ?? 15}%)`} value={platformFees} tone="neutral" />
       </div>
 
       <div className="card max-w-sm">
@@ -59,6 +59,26 @@ export default async function FinanceOverviewPage() {
             defaultValue={business?.default_price}
             className="input"
           />
+          <button type="submit" className="btn-primary shrink-0">Save</button>
+        </form>
+      </div>
+
+      <div className="card max-w-sm">
+        <h2 className="font-semibold mb-3">Loyalty program</h2>
+        <p className="text-xs text-neutral-500 mb-3">
+          Give customers a free haircut every Nth paid visit. Currently: every {business?.loyalty_interval ?? 3} paid visits.
+        </p>
+        <form action={updateLoyaltyInterval} className="flex gap-2 items-center">
+          <span className="text-sm text-neutral-600 shrink-0">Every</span>
+          <input
+            name="loyalty_interval"
+            type="number"
+            min={2}
+            step="1"
+            defaultValue={business?.loyalty_interval ?? 3}
+            className="input"
+          />
+          <span className="text-sm text-neutral-600 shrink-0">visits</span>
           <button type="submit" className="btn-primary shrink-0">Save</button>
         </form>
       </div>

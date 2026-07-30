@@ -62,6 +62,7 @@ export async function middleware(request: NextRequest) {
       super_admin: '/dashboard/super-admin',
       admin: '/dashboard/admin',
       barber: '/dashboard/barber',
+      manager: '/dashboard/manager',
       customer: '/dashboard/customer',
     };
 
@@ -69,6 +70,7 @@ export async function middleware(request: NextRequest) {
       '/dashboard/super-admin': 'super_admin',
       '/dashboard/admin': 'admin',
       '/dashboard/barber': 'barber',
+      '/dashboard/manager': 'manager',
       '/dashboard/customer': 'customer',
     };
 

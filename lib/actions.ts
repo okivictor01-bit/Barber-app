@@ -55,7 +55,21 @@ export async function updateBusinessPrice(formData: FormData) {
   revalidatePath('/dashboard/admin');
 }
 
-// ---------- ONBOARDING (owner or barber can onboard customers; only owner onboards barbers) ----------
+export async function updateLoyaltyInterval(formData: FormData) {
+  const { supabase, profile } = await requireProfile();
+  if (profile.role !== 'admin') throw new Error('Only the business owner can update the loyalty program');
+
+  const loyalty_interval = Math.max(2, Number(formData.get('loyalty_interval'))); // guard against 0/1, which would give free tickets every visit
+  const { error } = await supabase
+    .from('businesses')
+    .update({ loyalty_interval })
+    .eq('id', profile.business_id);
+  if (error) throw new Error(error.message);
+
+  revalidatePath('/dashboard/admin');
+}
+
+// ---------- ONBOARDING (owner or barber/manager can onboard customers; only owner onboards barbers/managers) ----------
 
 export async function onboardBarber(formData: FormData) {
   const { profile } = await requireProfile();
@@ -96,9 +110,47 @@ export async function onboardBarber(formData: FormData) {
   revalidatePath('/dashboard/admin/barbers');
 }
 
+export async function onboardManager(formData: FormData) {
+  const { profile } = await requireProfile();
+  if (profile.role !== 'admin') throw new Error('Only the business owner can onboard managers');
+
+  const email = String(formData.get('email'));
+  const full_name = String(formData.get('full_name'));
+  const phone = String(formData.get('phone') ?? '');
+  const temp_password = String(formData.get('password'));
+
+  const admin = createAdminClient();
+
+  const { data: userRes, error: userErr } = await admin.auth.admin.createUser({
+    email,
+    password: temp_password,
+    email_confirm: true,
+  });
+  if (userErr || !userRes.user) throw new Error(userErr?.message ?? 'Failed to create manager account');
+
+  const { error: profileErr } = await admin.from('profiles').insert({
+    id: userRes.user.id,
+    role: 'manager',
+    full_name,
+    phone,
+    business_id: profile.business_id,
+    created_by: profile.id,
+  });
+  if (profileErr) {
+    await admin.auth.admin.deleteUser(userRes.user.id);
+    throw new Error(profileErr.message);
+  }
+
+  await admin.auth.admin.updateUserById(userRes.user.id, {
+    app_metadata: { role: 'manager', business_id: profile.business_id },
+  });
+
+  revalidatePath('/dashboard/admin/managers');
+}
+
 export async function onboardCustomer(formData: FormData) {
   const { profile } = await requireProfile();
-  if (!['admin', 'barber'].includes(profile.role)) throw new Error('Not authorized');
+  if (!['admin', 'barber', 'manager'].includes(profile.role)) throw new Error('Not authorized');
 
   const email = String(formData.get('email'));
   const full_name = String(formData.get('full_name'));
@@ -218,7 +270,7 @@ export async function completeTicket(ticketId: string) {
 
 export async function submitExpense(formData: FormData) {
   const { supabase, profile } = await requireProfile();
-  if (!['admin', 'barber'].includes(profile.role)) throw new Error('Not authorized');
+  if (!['admin', 'barber', 'manager'].includes(profile.role)) throw new Error('Not authorized');
 
   const description = String(formData.get('description'));
   const amount = Number(formData.get('amount'));
@@ -239,6 +291,7 @@ export async function submitExpense(formData: FormData) {
 
   revalidatePath('/dashboard/admin/expenses');
   revalidatePath('/dashboard/barber/expenses');
+  revalidatePath('/dashboard/manager/expenses');
 }
 
 export async function reviewExpense(expenseId: string, decision: 'approved' | 'rejected') {

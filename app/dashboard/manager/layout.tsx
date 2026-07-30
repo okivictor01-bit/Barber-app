@@ -2,15 +2,12 @@ import Sidebar from '@/components/Sidebar';
 import { createClient } from '@/lib/supabase/server';
 
 const links = [
-  { href: '/dashboard/admin', label: 'Finance Overview' },
-  { href: '/dashboard/admin/tickets', label: 'Tickets' },
-  { href: '/dashboard/admin/barbers', label: 'Barbers' },
-  { href: '/dashboard/admin/managers', label: 'Managers' },
-  { href: '/dashboard/admin/customers', label: 'Customers' },
-  { href: '/dashboard/admin/expenses', label: 'Expenses' },
+  { href: '/dashboard/manager', label: 'Customers' },
+  { href: '/dashboard/manager/expenses', label: 'Expenses' },
+  { href: '/dashboard/manager/settings', label: 'Reset Password' },
 ];
 
-export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+export default async function ManagerLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -24,7 +21,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <div className="flex">
-      <Sidebar role="admin" links={links} businessName={business?.name} />
+      <Sidebar role="manager" links={links} businessName={business?.name} />
       <main className="flex-1 p-6 md:p-8">{children}</main>
     </div>
   );

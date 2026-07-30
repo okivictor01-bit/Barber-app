@@ -9,7 +9,7 @@ create extension if not exists "uuid-ossp";
 -- =========================================================
 -- 1. PROFILES  (1-1 with auth.users, holds role + basic info)
 -- =========================================================
-create type user_role as enum ('super_admin', 'admin', 'barber', 'customer');
+create type user_role as enum ('super_admin', 'admin', 'barber', 'manager', 'customer');
 
 create table profiles (
   id uuid primary key references auth.users(id) on delete cascade,
@@ -39,6 +39,7 @@ create table businesses (
   paystack_subaccount_code text, -- optional: for split payments at Paystack level
   default_price numeric(12,2) not null default 3000.00, -- standard haircut price (owner-editable)
   commission_rate numeric(5,2) not null default 15.00, -- platform % (overridable by super_admin)
+  loyalty_interval int not null default 3, -- every N paid transactions => 1 free ticket (owner-editable)
   is_active boolean not null default true,
   created_at timestamptz not null default now()
 );
@@ -179,7 +180,8 @@ begin
       where id = new.ticket_id;
 
     -- loyalty: every Nth paid transaction => free ticket
-    select loyalty_interval into v_loyalty_interval from platform_settings where id = 1;
+    -- Read the interval from the business's own setting (owner-editable)
+    select loyalty_interval into v_loyalty_interval from businesses where id = new.business_id;
 
     if v_new_count % v_loyalty_interval = 0 then
       insert into tickets (business_id, customer_id, status, is_free, amount)
@@ -234,7 +236,7 @@ create policy "users view own profile" on profiles
 
 create policy "owner views business staff/customers" on profiles
   for select using (
-    my_role() in ('admin','barber')
+    my_role() in ('admin','barber','manager')
     and business_id = my_business_id()
   );
 
@@ -262,7 +264,7 @@ create policy "super_admin all business_customers" on business_customers
   for all using (my_role() = 'super_admin');
 
 create policy "business staff view/manage own customers" on business_customers
-  for all using (business_id = my_business_id() and my_role() in ('admin','barber'));
+  for all using (business_id = my_business_id() and my_role() in ('admin','barber','manager'));
 
 create policy "customer views own loyalty record" on business_customers
   for select using (customer_id = auth.uid());
@@ -298,7 +300,7 @@ create policy "super_admin all expenses" on expenses
   for all using (my_role() = 'super_admin');
 
 create policy "business staff manage expenses" on expenses
-  for all using (business_id = my_business_id() and my_role() in ('admin','barber'));
+  for all using (business_id = my_business_id() and my_role() in ('admin','barber','manager'));
 
 -- ---- PLATFORM SETTINGS ----
 create policy "super_admin manages settings" on platform_settings

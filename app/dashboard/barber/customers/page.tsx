@@ -1,8 +1,8 @@
 import { createClient } from '@/lib/supabase/server';
-import { onboardCustomer, removeStaffOrCustomer } from '@/lib/actions';
+import { onboardCustomer } from '@/lib/actions';
 import OnboardForm from '@/components/OnboardForm';
 
-export default async function CustomersPage() {
+export default async function BarberCustomersPage() {
   const supabase = await createClient();
   const {
     data: { user },
@@ -17,7 +17,7 @@ export default async function CustomersPage() {
 
   const { data: bcRows } = await supabase
     .from('business_customers')
-    .select('*, profiles:customer_id(full_name, phone, is_active)')
+    .select('*, profiles:customer_id(full_name, phone)')
     .eq('business_id', profile!.business_id)
     .order('created_at', { ascending: false });
 
@@ -33,7 +33,7 @@ export default async function CustomersPage() {
       </div>
 
       <div className="card">
-        <h2 className="font-semibold mb-4">Your customers</h2>
+        <h2 className="font-semibold mb-4">Customers</h2>
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-neutral-500 border-b">
@@ -41,7 +41,6 @@ export default async function CustomersPage() {
               <th className="py-2 pr-4">Phone</th>
               <th className="py-2 pr-4">Paid visits</th>
               <th className="py-2 pr-4">Free tickets earned</th>
-              <th className="py-2 pr-4"></th>
             </tr>
           </thead>
           <tbody>
@@ -53,16 +52,11 @@ export default async function CustomersPage() {
                   {r.paid_transaction_count} <span className="text-neutral-400">(every {interval} is free)</span>
                 </td>
                 <td className="py-2 pr-4">{r.free_tickets_earned}</td>
-                <td className="py-2 pr-4">
-                  <form action={removeStaffOrCustomer.bind(null, r.customer_id)}>
-                    <button className="text-red-600 text-xs hover:underline">Remove</button>
-                  </form>
-                </td>
               </tr>
             ))}
             {(!bcRows || bcRows.length === 0) && (
               <tr>
-                <td colSpan={5} className="py-6 text-center text-neutral-400">No customers yet.</td>
+                <td colSpan={4} className="py-6 text-center text-neutral-400">No customers yet.</td>
               </tr>
             )}
           </tbody>
