@@ -8,11 +8,17 @@ export default async function AdminExpensesPage() {
   } = await supabase.auth.getUser();
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user!.id).single();
 
-  const { data: expenses } = await supabase
+  const { data: expenses, error: expensesError } = await supabase
     .from('expenses')
-    .select('*, profiles:submitted_by(full_name, role)')
+    .select('*')
     .eq('business_id', profile!.business_id)
     .order('created_at', { ascending: false });
+
+  const submitterIds = [...new Set((expenses ?? []).map((e) => e.submitted_by))];
+  const { data: submitterProfiles } = submitterIds.length
+    ? await supabase.from('profiles').select('id, full_name, role').in('id', submitterIds)
+    : { data: [] };
+  const profileMap = new Map((submitterProfiles ?? []).map((p) => [p.id, p]));
 
   const pending = (expenses ?? []).filter((e) => e.status === 'pending');
 
@@ -22,6 +28,9 @@ export default async function AdminExpensesPage() {
 
       <div className="card max-w-lg">
         <h2 className="font-semibold mb-4">Log an expense</h2>
+        {expensesError && (
+          <p className="text-sm text-red-600 mb-4">Couldn&apos;t load expenses: {expensesError.message}</p>
+        )}
         <form action={submitExpense} className="space-y-3">
           <input name="description" placeholder="Description" required className="input" />
           <input name="amount" type="number" step="0.01" placeholder="Amount (₦)" required className="input" />
@@ -51,7 +60,7 @@ export default async function AdminExpensesPage() {
             <tbody>
               {pending.map((e: any) => (
                 <tr key={e.id} className="border-b last:border-0">
-                  <td className="py-2 pr-4">{e.profiles?.full_name}</td>
+                  <td className="py-2 pr-4">{profileMap.get(e.submitted_by)?.full_name ?? '(name unavailable)'}</td>
                   <td className="py-2 pr-4">{e.description}</td>
                   <td className="py-2 pr-4">₦{Number(e.amount).toLocaleString()}</td>
                   <td className="py-2 pr-4 space-x-2">
@@ -85,7 +94,7 @@ export default async function AdminExpensesPage() {
             {(expenses ?? []).map((e: any) => (
               <tr key={e.id} className="border-b last:border-0">
                 <td className="py-2 pr-4">{new Date(e.created_at).toLocaleDateString()}</td>
-                <td className="py-2 pr-4">{e.profiles?.full_name}</td>
+                <td className="py-2 pr-4">{profileMap.get(e.submitted_by)?.full_name ?? '(name unavailable)'}</td>
                 <td className="py-2 pr-4">{e.description}</td>
                 <td className="py-2 pr-4">₦{Number(e.amount).toLocaleString()}</td>
                 <td className="py-2 pr-4"><span className={`badge-${e.status === 'approved' ? 'completed' : e.status === 'rejected' ? 'cancelled' : 'pending'}`}>{e.status}</span></td>

@@ -17,9 +17,15 @@ export default async function ManagerCustomersPage() {
 
   const { data: bcRows, error: bcError } = await supabase
     .from('business_customers')
-    .select('*, profiles:customer_id(full_name, phone)')
+    .select('*')
     .eq('business_id', profile!.business_id)
     .order('created_at', { ascending: false });
+
+  const customerIds = [...new Set((bcRows ?? []).map((r) => r.customer_id))];
+  const { data: customerProfiles } = customerIds.length
+    ? await supabase.from('profiles').select('id, full_name, phone, is_active').in('id', customerIds)
+    : { data: [] };
+  const profileMap = new Map((customerProfiles ?? []).map((p) => [p.id, p]));
 
   const interval = business?.loyalty_interval ?? 3;
 
@@ -49,8 +55,8 @@ export default async function ManagerCustomersPage() {
           <tbody>
             {(bcRows ?? []).map((r: any) => (
               <tr key={r.id} className="border-b last:border-0">
-                <td className="py-2 pr-4">{r.profiles?.full_name ?? '(name unavailable)'}</td>
-                <td className="py-2 pr-4">{r.profiles?.phone}</td>
+                <td className="py-2 pr-4">{profileMap.get(r.customer_id)?.full_name ?? '(name unavailable)'}</td>
+                <td className="py-2 pr-4">{profileMap.get(r.customer_id)?.phone}</td>
                 <td className="py-2 pr-4">
                   {r.paid_transaction_count} <span className="text-neutral-400">(every {interval} is free)</span>
                 </td>

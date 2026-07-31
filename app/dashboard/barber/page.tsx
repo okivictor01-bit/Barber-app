@@ -10,10 +10,16 @@ export default async function BarberTicketsPage() {
 
   const { data: tickets, error: ticketsError } = await supabase
     .from('tickets')
-    .select('*, profiles:customer_id(full_name, phone)')
+    .select('*')
     .eq('business_id', profile!.business_id)
     .order('created_at', { ascending: false })
     .limit(100);
+
+  const customerIds = [...new Set((tickets ?? []).map((t) => t.customer_id))];
+  const { data: customerProfiles } = customerIds.length
+    ? await supabase.from('profiles').select('id, full_name, phone').in('id', customerIds)
+    : { data: [] };
+  const profileMap = new Map((customerProfiles ?? []).map((p) => [p.id, p]));
 
   return (
     <div className="space-y-6">
@@ -37,7 +43,7 @@ export default async function BarberTicketsPage() {
           <tbody>
             {(tickets ?? []).map((t: any) => (
               <tr key={t.id} className="border-b last:border-0">
-                <td className="py-2 pr-4">{t.profiles?.full_name ?? '(name unavailable)'}</td>
+                <td className="py-2 pr-4">{profileMap.get(t.customer_id)?.full_name ?? '(name unavailable)'}</td>
                 <td className="py-2 pr-4">{t.is_free ? '🎁 Free' : 'Paid'}</td>
                 <td className="py-2 pr-4">{t.submitted_at ? new Date(t.submitted_at).toLocaleString() : '—'}</td>
                 <td className="py-2 pr-4"><span className={`badge-${t.status}`}>{t.status}</span></td>

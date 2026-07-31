@@ -4,16 +4,25 @@ import { updateCommissionRate, toggleBusinessActive } from '@/lib/actions';
 export default async function BusinessesPage() {
   const supabase = await createClient();
 
-  const { data: businesses } = await supabase
+  const { data: businesses, error: businessesError } = await supabase
     .from('businesses')
-    .select('*, profiles!businesses_owner_id_fkey(full_name)')
+    .select('*')
     .order('created_at', { ascending: false });
+
+  const ownerIds = [...new Set((businesses ?? []).map((b) => b.owner_id))];
+  const { data: ownerProfiles } = ownerIds.length
+    ? await supabase.from('profiles').select('id, full_name').in('id', ownerIds)
+    : { data: [] };
+  const profileMap = new Map((ownerProfiles ?? []).map((p) => [p.id, p]));
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">Businesses</h1>
 
       <div className="card overflow-x-auto">
+        {businessesError && (
+          <p className="text-sm text-red-600 mb-4">Couldn&apos;t load businesses: {businessesError.message}</p>
+        )}
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-neutral-500 border-b">
@@ -28,7 +37,7 @@ export default async function BusinessesPage() {
             {(businesses ?? []).map((b: any) => (
               <tr key={b.id} className="border-b last:border-0">
                 <td className="py-2 pr-4">{b.name}</td>
-                <td className="py-2 pr-4">{b.profiles?.full_name ?? '—'}</td>
+                <td className="py-2 pr-4">{profileMap.get(b.owner_id)?.full_name ?? '—'}</td>
                 <td className="py-2 pr-4">
                   <form action={updateCommissionRate.bind(null, b.id)} className="flex gap-2 items-center">
                     <input
@@ -55,7 +64,7 @@ export default async function BusinessesPage() {
                 </td>
               </tr>
             ))}
-            {(!businesses || businesses.length === 0) && (
+            {(!businesses || businesses.length === 0) && !businessesError && (
               <tr><td colSpan={5} className="py-6 text-center text-neutral-400">No businesses registered yet.</td></tr>
             )}
           </tbody>
