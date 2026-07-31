@@ -229,6 +229,9 @@ export async function submitTicket(ticketId: string) {
   if (error) throw new Error(error.message);
 
   revalidatePath('/dashboard/customer');
+  revalidatePath('/dashboard/admin/tickets');
+  revalidatePath('/dashboard/barber');
+  revalidatePath('/dashboard/manager/tickets');
 }
 
 export async function approveTicket(ticketId: string) {

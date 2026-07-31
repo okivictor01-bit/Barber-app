@@ -8,7 +8,7 @@ export default async function AdminTicketsPage() {
   } = await supabase.auth.getUser();
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user!.id).single();
 
-  const { data: tickets } = await supabase
+  const { data: tickets, error: ticketsError } = await supabase
     .from('tickets')
     .select('*, profiles:customer_id(full_name, phone)')
     .eq('business_id', profile!.business_id)
@@ -23,6 +23,9 @@ export default async function AdminTicketsPage() {
       </p>
 
       <div className="card">
+        {ticketsError && (
+          <p className="text-sm text-red-600 mb-4">Couldn&apos;t load tickets: {ticketsError.message}</p>
+        )}
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-neutral-500 border-b">
@@ -37,7 +40,7 @@ export default async function AdminTicketsPage() {
           <tbody>
             {(tickets ?? []).map((t: any) => (
               <tr key={t.id} className="border-b last:border-0">
-                <td className="py-2 pr-4">{t.profiles?.full_name}</td>
+                <td className="py-2 pr-4">{t.profiles?.full_name ?? '(name unavailable)'}</td>
                 <td className="py-2 pr-4">{t.is_free ? '🎁 Free (loyalty)' : 'Paid'}</td>
                 <td className="py-2 pr-4">₦{Number(t.amount).toLocaleString()}</td>
                 <td className="py-2 pr-4">{t.submitted_at ? new Date(t.submitted_at).toLocaleString() : '—'}</td>
@@ -58,7 +61,7 @@ export default async function AdminTicketsPage() {
                 </td>
               </tr>
             ))}
-            {(!tickets || tickets.length === 0) && (
+            {(!tickets || tickets.length === 0) && !ticketsError && (
               <tr>
                 <td colSpan={6} className="py-6 text-center text-neutral-400">No tickets yet.</td>
               </tr>
