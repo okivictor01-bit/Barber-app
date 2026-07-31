@@ -13,9 +13,9 @@ export default async function CustomerDashboard({
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: memberships } = await supabase
+  const { data: memberships, error: membershipsError } = await supabase
     .from('business_customers')
-    .select('*, businesses(id, name, default_price)')
+    .select('*, businesses(id, name, default_price, loyalty_interval)')
     .eq('customer_id', user!.id);
 
   const businesses = (memberships ?? []).map((m: any) => m.businesses).filter(Boolean);
@@ -32,14 +32,22 @@ export default async function CustomerDashboard({
         .order('created_at', { ascending: false })
     : { data: [] };
 
-  const loyaltyInterval = 3;
+  const loyaltyInterval = activeBusiness?.loyalty_interval ?? 3;
   const progress = activeMembership ? activeMembership.paid_transaction_count % loyaltyInterval : 0;
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">My Tickets</h1>
 
-      {businesses.length === 0 && (
+      {membershipsError && (
+        <div className="card">
+          <p className="text-sm text-red-600">
+            Couldn&apos;t load your businesses: {membershipsError.message}
+          </p>
+        </div>
+      )}
+
+      {businesses.length === 0 && !membershipsError && (
         <div className="card">
           <p className="text-neutral-500">
             You&apos;re not yet linked to a barbing business. Ask your barber shop to onboard you.

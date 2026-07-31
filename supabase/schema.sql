@@ -237,7 +237,13 @@ create policy "users view own profile" on profiles
 create policy "owner views business staff/customers" on profiles
   for select using (
     my_role() in ('admin','barber','manager')
-    and business_id = my_business_id()
+    and (
+      business_id = my_business_id()
+      or exists (
+        select 1 from business_customers bc
+        where bc.customer_id = profiles.id and bc.business_id = my_business_id()
+      )
+    )
   );
 
 create policy "owner manages business staff" on profiles
@@ -257,7 +263,13 @@ create policy "owner manages own business" on businesses
   for all using (owner_id = auth.uid());
 
 create policy "staff/customers view their business" on businesses
-  for select using (id = my_business_id());
+  for select using (
+    id = my_business_id()
+    or exists (
+      select 1 from business_customers bc
+      where bc.business_id = businesses.id and bc.customer_id = auth.uid()
+    )
+  );
 
 -- ---- BUSINESS_CUSTOMERS ----
 create policy "super_admin all business_customers" on business_customers

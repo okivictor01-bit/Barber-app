@@ -15,7 +15,7 @@ export default async function CustomersPage() {
     .eq('id', profile!.business_id)
     .single();
 
-  const { data: bcRows } = await supabase
+  const { data: bcRows, error: bcError } = await supabase
     .from('business_customers')
     .select('*, profiles:customer_id(full_name, phone, is_active)')
     .eq('business_id', profile!.business_id)
@@ -34,6 +34,11 @@ export default async function CustomersPage() {
 
       <div className="card">
         <h2 className="font-semibold mb-4">Your customers</h2>
+        {bcError && (
+          <p className="text-sm text-red-600 mb-4">
+            Couldn&apos;t load customers: {bcError.message}
+          </p>
+        )}
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-neutral-500 border-b">
@@ -47,7 +52,7 @@ export default async function CustomersPage() {
           <tbody>
             {(bcRows ?? []).map((r: any) => (
               <tr key={r.id} className="border-b last:border-0">
-                <td className="py-2 pr-4">{r.profiles?.full_name}</td>
+                <td className="py-2 pr-4">{r.profiles?.full_name ?? '(name unavailable)'}</td>
                 <td className="py-2 pr-4">{r.profiles?.phone}</td>
                 <td className="py-2 pr-4">
                   {r.paid_transaction_count} <span className="text-neutral-400">(every {interval} is free)</span>
@@ -60,7 +65,7 @@ export default async function CustomersPage() {
                 </td>
               </tr>
             ))}
-            {(!bcRows || bcRows.length === 0) && (
+            {(!bcRows || bcRows.length === 0) && !bcError && (
               <tr>
                 <td colSpan={5} className="py-6 text-center text-neutral-400">No customers yet.</td>
               </tr>
