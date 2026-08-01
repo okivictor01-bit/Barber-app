@@ -1,11 +1,13 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const resetSuccess = searchParams.get('reset') === 'success';
   const supabase = createClient();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -46,6 +48,9 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center px-4">
       <form onSubmit={handleLogin} className="card w-full max-w-sm space-y-4">
         <h1 className="text-xl font-semibold text-center">Sign in to BarbFlow</h1>
+        {resetSuccess && (
+          <p className="text-sm text-green-600 text-center">Password updated — sign in with your new password.</p>
+        )}
         {error && <p className="text-sm text-red-600">{error}</p>}
         <div>
           <label className="text-sm font-medium">Email</label>
@@ -67,6 +72,11 @@ export default function LoginPage() {
             onChange={(e) => setPassword(e.target.value)}
           />
         </div>
+        <div className="text-right -mt-2">
+          <a href="/forgot-password" className="text-xs text-brand-600 hover:underline">
+            Forgot password?
+          </a>
+        </div>
         <button type="submit" disabled={loading} className="btn-primary w-full">
           {loading ? 'Signing in…' : 'Sign in'}
         </button>
@@ -78,5 +88,13 @@ export default function LoginPage() {
         </a>
       </form>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }
