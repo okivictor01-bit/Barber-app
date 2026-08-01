@@ -189,9 +189,10 @@ begin
     values (new.business_id, new.customer_id)
     on conflict (business_id, customer_id) do nothing;
 
-    -- create the paid ticket tied to this transaction (customer still must click "submit")
-    update tickets set transaction_id = new.id
-      where id = new.ticket_id;
+    -- (Ticket creation + linking now happens explicitly in the webhook's
+    -- application code, not here — this keeps it correct regardless of the
+    -- exact order those two writes happen in, which matters for the
+    -- duplicate-delivery protection added there.)
 
     -- Only the standard haircut counts toward loyalty — add-on services
     -- (beard trim, dyeing, etc.) never do.
