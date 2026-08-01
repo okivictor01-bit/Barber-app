@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
   // with the request to pay less than the real price).
   const { data: business, error: bizErr } = await supabase
     .from('businesses')
-    .select('id, commission_rate, default_price')
+    .select('id, commission_rate, default_price, paystack_subaccount_code')
     .eq('id', business_id)
     .single();
 
@@ -87,6 +87,12 @@ export async function POST(req: NextRequest) {
     reference,
     callback_url: `${req.nextUrl.origin}/dashboard/customer?payment=callback`,
     metadata: { business_id, customer_id: user.id, service_id: service_id ?? null },
+    // If the owner has completed payout setup, split automatically at the
+    // moment of charge: our platform_fee goes straight to the main account,
+    // the rest goes straight to their bank. If not set up yet, everything
+    // lands in the main account and payout stays manual for now.
+    subaccount: business.paystack_subaccount_code ?? undefined,
+    transactionChargeNaira: business.paystack_subaccount_code ? platform_fee : undefined,
   });
 
   return NextResponse.json(paystackRes);

@@ -36,7 +36,10 @@ create table businesses (
   slug text unique not null,
   address text,
   phone text,
-  paystack_subaccount_code text, -- optional: for split payments at Paystack level
+  paystack_subaccount_code text, -- set once the owner completes payout setup; enables auto-split payments
+  settlement_bank_name text,
+  settlement_account_name text,
+  settlement_account_number text,
   default_price numeric(12,2) not null default 3000.00, -- standard haircut price (owner-editable)
   commission_rate numeric(5,2) not null default 10.00, -- platform % (overridable by super_admin)
   loyalty_interval int not null default 3, -- every N paid transactions => 1 free ticket (owner-editable)

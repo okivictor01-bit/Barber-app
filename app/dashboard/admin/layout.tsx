@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 
 const links = [
   { href: '/dashboard/admin', label: 'Finance Overview' },
+  { href: '/dashboard/admin/payouts', label: 'Payouts' },
   { href: '/dashboard/admin/tickets', label: 'Tickets' },
   { href: '/dashboard/admin/services', label: 'Services' },
   { href: '/dashboard/admin/barbers', label: 'Barbers' },
