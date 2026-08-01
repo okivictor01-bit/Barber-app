@@ -44,16 +44,22 @@ async function generatePdf(data: {
     doc.text('Transactions', 14, nextY);
     autoTable(doc, {
       startY: nextY + 4,
-      head: [['Date', 'Reference', 'Service', 'Amount', 'Platform Fee', 'Your Share']],
-      body: data.transactions.map((t) => [
-        new Date(t.paid_at).toLocaleDateString(),
-        t.paystack_reference,
-        t.service_name ?? 'Haircut',
-        `NGN ${Number(t.amount).toLocaleString()}`,
-        `NGN ${Number(t.platform_fee).toLocaleString()}`,
-        `NGN ${Number(t.business_amount).toLocaleString()}`,
-      ]),
-      styles: { fontSize: 8 },
+      head: [['Date', 'Reference', 'Service', 'Amount', 'Platform Fee', 'Your Share', 'Paystack Fee', 'Net to Bank']],
+      body: data.transactions.map((t) => {
+        const paystackFee = t.used_subaccount ? Number(t.paystack_fee ?? 0) : 0;
+        const netToBank = t.used_subaccount ? Number(t.business_amount) - paystackFee : Number(t.business_amount);
+        return [
+          new Date(t.paid_at).toLocaleDateString(),
+          t.paystack_reference,
+          t.service_name ?? 'Haircut',
+          `NGN ${Number(t.amount).toLocaleString()}`,
+          `NGN ${Number(t.platform_fee).toLocaleString()}`,
+          `NGN ${Number(t.business_amount).toLocaleString()}`,
+          t.used_subaccount ? `NGN ${paystackFee.toLocaleString()}` : '-',
+          t.used_subaccount ? `NGN ${netToBank.toLocaleString()}` : '-',
+        ];
+      }),
+      styles: { fontSize: 7 },
       headStyles: { fillColor: [234, 88, 12] },
     });
     // @ts-ignore — lastAutoTable is added at runtime by the plugin

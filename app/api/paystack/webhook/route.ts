@@ -15,7 +15,10 @@ export async function POST(req: NextRequest) {
   const event = JSON.parse(rawBody);
 
   if (event.event === 'charge.success') {
-    const { reference } = event.data;
+    const { reference, fees } = event.data;
+    // Paystack reports its own processing fee in kobo on the webhook payload.
+    const paystackFeeNaira = typeof fees === 'number' ? fees / 100 : null;
+
     const supabase = createAdminClient();
 
     // Look up the pending transaction, then create the ticket + mark success.
@@ -57,6 +60,7 @@ export async function POST(req: NextRequest) {
         status: 'success',
         paid_at: new Date().toISOString(),
         ticket_id: ticket?.id ?? null,
+        paystack_fee: paystackFeeNaira,
       })
       .eq('id', tx.id);
 

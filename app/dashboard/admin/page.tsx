@@ -19,7 +19,7 @@ export default async function FinanceOverviewPage({
 
   const { data: business } = await supabase
     .from('businesses')
-    .select('default_price, commission_rate, loyalty_interval')
+    .select('default_price, commission_rate, loyalty_interval, paystack_subaccount_code')
     .eq('id', businessId)
     .single();
 
@@ -28,7 +28,7 @@ export default async function FinanceOverviewPage({
   const { from: monthFrom, to: monthTo } = getPeriodRange('month');
   const { data: monthTransactions } = await supabase
     .from('transactions')
-    .select('amount, platform_fee')
+    .select('amount, platform_fee, paystack_fee, used_subaccount')
     .eq('business_id', businessId)
     .eq('status', 'success')
     .gte('paid_at', monthFrom.toISOString())
@@ -45,6 +45,11 @@ export default async function FinanceOverviewPage({
   const moneyIn = (monthTransactions ?? []).reduce((s, t) => s + Number(t.amount), 0);
   const platformFees = (monthTransactions ?? []).reduce((s, t) => s + Number(t.platform_fee), 0);
   const moneyOut = (monthExpenses ?? []).reduce((s, e) => s + Number(e.amount), 0);
+  // Paystack's own processing fee — only relevant where auto-split (subaccount)
+  // was active, since that's when the owner actually bears it themselves.
+  const paystackFees = (monthTransactions ?? [])
+    .filter((t) => t.used_subaccount)
+    .reduce((s, t) => s + Number(t.paystack_fee ?? 0), 0);
   const profit = moneyIn - platformFees - moneyOut;
 
   // Transaction report defaults to TODAY; searching by date shows past days.
@@ -76,6 +81,16 @@ export default async function FinanceOverviewPage({
         <StatCard label={profit >= 0 ? 'Profit' : 'Loss'} value={profit} tone={profit >= 0 ? 'green' : 'red'} />
         <StatCard label={`Platform Fees Paid (${business?.commission_rate ?? 10}%)`} value={platformFees} tone="neutral" />
       </div>
+
+      {business?.paystack_subaccount_code && (
+        <div className="card max-w-sm">
+          <p className="text-sm text-neutral-500">Paystack Processing Fees (this month)</p>
+          <p className="text-2xl font-bold mt-1 text-neutral-700">₦{paystackFees.toLocaleString()}</p>
+          <p className="text-xs text-neutral-400 mt-1">
+            Deducted automatically from your payouts — separate from the platform&apos;s commission above.
+          </p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="card max-w-sm">
@@ -160,22 +175,36 @@ export default async function FinanceOverviewPage({
                 <th className="py-2 pr-4">Amount</th>
                 <th className="py-2 pr-4">Platform Fee</th>
                 <th className="py-2 pr-4">Your Share</th>
+                <th className="py-2 pr-4">Paystack Fee</th>
+                <th className="py-2 pr-4">Net to Bank</th>
               </tr>
             </thead>
             <tbody>
-              {(reportTransactions ?? []).map((t) => (
-                <tr key={t.id} className="border-b last:border-0">
-                  <td className="py-2 pr-4">{new Date(t.paid_at).toLocaleString()}</td>
-                  <td className="py-2 pr-4 font-mono text-xs">{t.paystack_reference}</td>
-                  <td className="py-2 pr-4">{t.service_name ?? 'Haircut'}</td>
-                  <td className="py-2 pr-4">₦{Number(t.amount).toLocaleString()}</td>
-                  <td className="py-2 pr-4">₦{Number(t.platform_fee).toLocaleString()}</td>
-                  <td className="py-2 pr-4 font-medium">₦{Number(t.business_amount).toLocaleString()}</td>
-                </tr>
-              ))}
+              {(reportTransactions ?? []).map((t) => {
+                const paystackFee = t.used_subaccount ? Number(t.paystack_fee ?? 0) : 0;
+                const netToBank = t.used_subaccount
+                  ? Number(t.business_amount) - paystackFee
+                  : Number(t.business_amount);
+                return (
+                  <tr key={t.id} className="border-b last:border-0">
+                    <td className="py-2 pr-4">{new Date(t.paid_at).toLocaleString()}</td>
+                    <td className="py-2 pr-4 font-mono text-xs">{t.paystack_reference}</td>
+                    <td className="py-2 pr-4">{t.service_name ?? 'Haircut'}</td>
+                    <td className="py-2 pr-4">₦{Number(t.amount).toLocaleString()}</td>
+                    <td className="py-2 pr-4">₦{Number(t.platform_fee).toLocaleString()}</td>
+                    <td className="py-2 pr-4 font-medium">₦{Number(t.business_amount).toLocaleString()}</td>
+                    <td className="py-2 pr-4 text-neutral-500">
+                      {t.used_subaccount ? `₦${paystackFee.toLocaleString()}` : '—'}
+                    </td>
+                    <td className="py-2 pr-4 font-medium">
+                      {t.used_subaccount ? `₦${netToBank.toLocaleString()}` : '—'}
+                    </td>
+                  </tr>
+                );
+              })}
               {(!reportTransactions || reportTransactions.length === 0) && !reportError && (
                 <tr>
-                  <td colSpan={6} className="py-6 text-center text-neutral-400">
+                  <td colSpan={8} className="py-6 text-center text-neutral-400">
                     No transactions {isSearching ? 'in this range' : 'today'}.
                   </td>
                 </tr>

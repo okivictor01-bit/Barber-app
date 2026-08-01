@@ -75,6 +75,7 @@ export async function POST(req: NextRequest) {
     service_id: service_id ?? null,
     service_name: serviceName,
     is_loyalty_eligible: isLoyaltyEligible,
+    used_subaccount: Boolean(business.paystack_subaccount_code),
   });
 
   if (txErr) {

@@ -120,6 +120,8 @@ create table transactions (
   service_id uuid references services(id) on delete set null, -- null = standard haircut
   service_name text,
   is_loyalty_eligible boolean not null default true, -- only true for the standard haircut
+  paystack_fee numeric(12,2), -- Paystack's actual processing fee, captured from the webhook
+  used_subaccount boolean not null default false, -- true if this payment auto-split to the owner's bank
   paid_at timestamptz,
   created_at timestamptz not null default now()
 );
