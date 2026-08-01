@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     // Look up the pending transaction, then create the ticket + mark success.
     const { data: tx, error: findErr } = await supabase
       .from('transactions')
-      .select('id, business_id, customer_id, amount')
+      .select('id, business_id, customer_id, amount, service_id, service_name')
       .eq('paystack_reference', reference)
       .single();
 
@@ -39,6 +39,8 @@ export async function POST(req: NextRequest) {
         status: 'pending',
         is_free: false,
         amount: tx.amount,
+        service_id: tx.service_id,
+        service_name: tx.service_name,
       })
       .select()
       .single();

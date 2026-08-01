@@ -34,7 +34,7 @@ export default async function BarberTicketsPage() {
           <thead>
             <tr className="text-left text-neutral-500 border-b">
               <th className="py-2 pr-4">Customer</th>
-              <th className="py-2 pr-4">Type</th>
+              <th className="py-2 pr-4">Service</th>
               <th className="py-2 pr-4">Submitted</th>
               <th className="py-2 pr-4">Status</th>
               <th className="py-2 pr-4"></th>
@@ -44,7 +44,7 @@ export default async function BarberTicketsPage() {
             {(tickets ?? []).map((t: any) => (
               <tr key={t.id} className="border-b last:border-0">
                 <td className="py-2 pr-4">{profileMap.get(t.customer_id)?.full_name ?? '(name unavailable)'}</td>
-                <td className="py-2 pr-4">{t.is_free ? '🎁 Free' : 'Paid'}</td>
+                <td className="py-2 pr-4">{t.is_free ? '🎁 ' : ''}{t.service_name ?? 'Haircut'}</td>
                 <td className="py-2 pr-4">{t.submitted_at ? new Date(t.submitted_at).toLocaleString() : '—'}</td>
                 <td className="py-2 pr-4"><span className={`badge-${t.status}`}>{t.status}</span></td>
                 <td className="py-2 pr-4 space-x-2">

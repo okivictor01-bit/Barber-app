@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
-  const { business_id } = await req.json();
+  const { business_id, service_id } = await req.json();
 
   if (!business_id) {
     return NextResponse.json({ error: 'business_id is required' }, { status: 400 });
@@ -32,7 +32,30 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Business not found' }, { status: 404 });
   }
 
-  const amount = Number(business.default_price);
+  // No service_id (or explicitly null) = the standard haircut, which is the
+  // only loyalty-eligible service. Any other service_id must belong to this
+  // business and be active — priced independently, never loyalty-eligible.
+  let amount = Number(business.default_price);
+  let serviceName = 'Haircut';
+  let isLoyaltyEligible = true;
+
+  if (service_id) {
+    const { data: service, error: serviceErr } = await supabase
+      .from('services')
+      .select('id, name, price, is_active')
+      .eq('id', service_id)
+      .eq('business_id', business_id)
+      .single();
+
+    if (serviceErr || !service || !service.is_active) {
+      return NextResponse.json({ error: 'Service not found or no longer available' }, { status: 404 });
+    }
+
+    amount = Number(service.price);
+    serviceName = service.name;
+    isLoyaltyEligible = false;
+  }
+
   const { platform_fee, business_amount } = splitAmount(amount, business.commission_rate);
 
   const reference = `barb_${crypto.randomUUID()}`;
@@ -49,6 +72,9 @@ export async function POST(req: NextRequest) {
     business_amount,
     paystack_reference: reference,
     status: 'pending',
+    service_id: service_id ?? null,
+    service_name: serviceName,
+    is_loyalty_eligible: isLoyaltyEligible,
   });
 
   if (txErr) {
@@ -60,7 +86,7 @@ export async function POST(req: NextRequest) {
     amountNaira: amount,
     reference,
     callback_url: `${req.nextUrl.origin}/dashboard/customer?payment=callback`,
-    metadata: { business_id, customer_id: user.id },
+    metadata: { business_id, customer_id: user.id, service_id: service_id ?? null },
   });
 
   return NextResponse.json(paystackRes);

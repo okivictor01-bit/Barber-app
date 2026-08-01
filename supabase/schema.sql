@@ -63,6 +63,20 @@ create table business_customers (
 );
 
 -- =========================================================
+-- 3b. SERVICES (owner-managed add-ons: beard trim, dyeing, etc.)
+--     The standard haircut (businesses.default_price) is NOT a row here —
+--     it's the only loyalty-eligible service and stays on businesses.
+-- =========================================================
+create table services (
+  id uuid primary key default uuid_generate_v4(),
+  business_id uuid not null references businesses(id) on delete cascade,
+  name text not null,
+  price numeric(12,2) not null,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+-- =========================================================
 -- 4. TICKETS
 -- =========================================================
 create type ticket_status as enum ('pending', 'approved', 'completed', 'cancelled');
@@ -76,6 +90,8 @@ create table tickets (
   is_free boolean not null default false,
   amount numeric(12,2) not null default 0, -- 0 if free ticket
   transaction_id uuid, -- linked after payment (nullable for free tickets with no payment)
+  service_id uuid references services(id) on delete set null, -- null = standard haircut
+  service_name text, -- snapshot, so it stays correct even if the service is later renamed/removed
   submitted_at timestamptz, -- when customer clicked "submit ticket"
   approved_by uuid references auth.users(id),
   approved_at timestamptz,
@@ -94,10 +110,13 @@ create table transactions (
   customer_id uuid not null references auth.users(id),
   ticket_id uuid references tickets(id),
   amount numeric(12,2) not null,
-  platform_fee numeric(12,2) not null,   -- 15% (or business.commission_rate)
-  business_amount numeric(12,2) not null, -- 85%
+  platform_fee numeric(12,2) not null,   -- 10% (or business.commission_rate)
+  business_amount numeric(12,2) not null, -- 90%
   paystack_reference text unique not null,
   status transaction_status not null default 'pending',
+  service_id uuid references services(id) on delete set null, -- null = standard haircut
+  service_name text,
+  is_loyalty_eligible boolean not null default true, -- only true for the standard haircut
   paid_at timestamptz,
   created_at timestamptz not null default now()
 );
@@ -165,31 +184,35 @@ begin
     values (new.business_id, new.customer_id)
     on conflict (business_id, customer_id) do nothing;
 
-    select * into v_bc from business_customers
-      where business_id = new.business_id and customer_id = new.customer_id
-      for update;
-
-    v_new_count := v_bc.paid_transaction_count + 1;
-
-    update business_customers
-      set paid_transaction_count = v_new_count
-      where id = v_bc.id;
-
     -- create the paid ticket tied to this transaction (customer still must click "submit")
     update tickets set transaction_id = new.id
       where id = new.ticket_id;
 
-    -- loyalty: every Nth paid transaction => free ticket
-    -- Read the interval from the business's own setting (owner-editable)
-    select loyalty_interval into v_loyalty_interval from businesses where id = new.business_id;
+    -- Only the standard haircut counts toward loyalty — add-on services
+    -- (beard trim, dyeing, etc.) never do.
+    if new.is_loyalty_eligible then
+      select * into v_bc from business_customers
+        where business_id = new.business_id and customer_id = new.customer_id
+        for update;
 
-    if v_new_count % v_loyalty_interval = 0 then
-      insert into tickets (business_id, customer_id, status, is_free, amount)
-      values (new.business_id, new.customer_id, 'pending', true, 0);
+      v_new_count := v_bc.paid_transaction_count + 1;
 
       update business_customers
-        set free_tickets_earned = free_tickets_earned + 1
+        set paid_transaction_count = v_new_count
         where id = v_bc.id;
+
+      -- loyalty: every Nth paid haircut => free ticket
+      -- Read the interval from the business's own setting (owner-editable)
+      select loyalty_interval into v_loyalty_interval from businesses where id = new.business_id;
+
+      if v_new_count % v_loyalty_interval = 0 then
+        insert into tickets (business_id, customer_id, status, is_free, amount, service_name)
+        values (new.business_id, new.customer_id, 'pending', true, 0, 'Haircut');
+
+        update business_customers
+          set free_tickets_earned = free_tickets_earned + 1
+          where id = v_bc.id;
+      end if;
     end if;
 
   end if;
@@ -217,6 +240,7 @@ alter table tickets enable row level security;
 alter table transactions enable row level security;
 alter table expenses enable row level security;
 alter table platform_settings enable row level security;
+alter table services enable row level security;
 
 -- Helper: current user's role
 create or replace function my_role() returns user_role as $$
@@ -313,6 +337,24 @@ create policy "super_admin all expenses" on expenses
 
 create policy "business staff manage expenses" on expenses
   for all using (business_id = my_business_id() and my_role() in ('admin','barber','manager'));
+
+-- ---- SERVICES ----
+create policy "owner manages own services" on services
+  for all using (business_id = my_business_id() and my_role() = 'admin');
+
+create policy "staff view own business services" on services
+  for select using (business_id = my_business_id() and my_role() in ('admin','barber','manager'));
+
+create policy "customer views linked business services" on services
+  for select using (
+    exists (
+      select 1 from business_customers bc
+      where bc.business_id = services.business_id and bc.customer_id = auth.uid()
+    )
+  );
+
+create policy "super_admin full access services" on services
+  for all using (my_role() = 'super_admin');
 
 -- ---- PLATFORM SETTINGS ----
 create policy "super_admin manages settings" on platform_settings

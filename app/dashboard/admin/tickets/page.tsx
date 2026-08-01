@@ -36,7 +36,7 @@ export default async function AdminTicketsPage() {
           <thead>
             <tr className="text-left text-neutral-500 border-b">
               <th className="py-2 pr-4">Customer</th>
-              <th className="py-2 pr-4">Type</th>
+              <th className="py-2 pr-4">Service</th>
               <th className="py-2 pr-4">Amount</th>
               <th className="py-2 pr-4">Submitted</th>
               <th className="py-2 pr-4">Status</th>
@@ -47,7 +47,7 @@ export default async function AdminTicketsPage() {
             {(tickets ?? []).map((t: any) => (
               <tr key={t.id} className="border-b last:border-0">
                 <td className="py-2 pr-4">{profileMap.get(t.customer_id)?.full_name ?? '(name unavailable)'}</td>
-                <td className="py-2 pr-4">{t.is_free ? '🎁 Free (loyalty)' : 'Paid'}</td>
+                <td className="py-2 pr-4">{t.is_free ? '🎁 ' : ''}{t.service_name ?? 'Haircut'}</td>
                 <td className="py-2 pr-4">₦{Number(t.amount).toLocaleString()}</td>
                 <td className="py-2 pr-4">{t.submitted_at ? new Date(t.submitted_at).toLocaleString() : '—'}</td>
                 <td className="py-2 pr-4">

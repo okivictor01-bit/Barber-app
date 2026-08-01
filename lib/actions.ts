@@ -69,7 +69,59 @@ export async function updateLoyaltyInterval(formData: FormData) {
   revalidatePath('/dashboard/admin');
 }
 
-// ---------- ONBOARDING (owner or barber/manager can onboard customers; only owner onboards barbers/managers) ----------
+// ---------- SERVICES (owner-managed add-ons, never loyalty-eligible) ----------
+
+export async function addService(formData: FormData) {
+  const { supabase, profile } = await requireProfile();
+  if (profile.role !== 'admin') throw new Error('Only the business owner can manage services');
+
+  const name = String(formData.get('name')).trim();
+  const price = Number(formData.get('price'));
+  if (!name) throw new Error('Service name is required');
+  if (!(price > 0)) throw new Error('Price must be greater than 0');
+
+  const { error } = await supabase.from('services').insert({
+    business_id: profile.business_id,
+    name,
+    price,
+  });
+  if (error) throw new Error(error.message);
+
+  revalidatePath('/dashboard/admin/services');
+}
+
+export async function updateService(serviceId: string, formData: FormData) {
+  const { supabase, profile } = await requireProfile();
+  if (profile.role !== 'admin') throw new Error('Only the business owner can manage services');
+
+  const name = String(formData.get('name')).trim();
+  const price = Number(formData.get('price'));
+  if (!name) throw new Error('Service name is required');
+  if (!(price > 0)) throw new Error('Price must be greater than 0');
+
+  const { error } = await supabase
+    .from('services')
+    .update({ name, price })
+    .eq('id', serviceId)
+    .eq('business_id', profile.business_id);
+  if (error) throw new Error(error.message);
+
+  revalidatePath('/dashboard/admin/services');
+}
+
+export async function toggleServiceActive(serviceId: string, isActive: boolean) {
+  const { supabase, profile } = await requireProfile();
+  if (profile.role !== 'admin') throw new Error('Only the business owner can manage services');
+
+  const { error } = await supabase
+    .from('services')
+    .update({ is_active: !isActive })
+    .eq('id', serviceId)
+    .eq('business_id', profile.business_id);
+  if (error) throw new Error(error.message);
+
+  revalidatePath('/dashboard/admin/services');
+}
 
 export async function onboardBarber(formData: FormData) {
   const { profile } = await requireProfile();
