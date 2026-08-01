@@ -56,10 +56,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: expError.message }, { status: 500 });
   }
 
-  const moneyIn = (transactions ?? []).reduce((s, t) => s + Number(t.business_amount), 0);
+  const moneyIn = (transactions ?? []).reduce((s, t) => s + Number(t.amount), 0);
   const platformFees = (transactions ?? []).reduce((s, t) => s + Number(t.platform_fee), 0);
   const moneyOut = (expenses ?? []).reduce((s, e) => s + Number(e.amount), 0);
-  const profit = moneyIn - moneyOut;
+  const profit = moneyIn - platformFees - moneyOut;
 
   return NextResponse.json({
     businessName: business?.name ?? 'Business',

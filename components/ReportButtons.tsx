@@ -32,7 +32,7 @@ async function generatePdf(data: {
   doc.setTextColor(0);
   const summaryY = 42;
   const naira = (n: number) => `NGN ${n.toLocaleString()}`;
-  doc.text(`Money In: ${naira(data.moneyIn)}`, 14, summaryY);
+  doc.text(`Money In (total revenue): ${naira(data.moneyIn)}`, 14, summaryY);
   doc.text(`Money Out (expenses): ${naira(data.moneyOut)}`, 14, summaryY + 6);
   doc.text(`${data.profit >= 0 ? 'Profit' : 'Loss'}: ${naira(Math.abs(data.profit))}`, 14, summaryY + 12);
   doc.text(`Platform Fees: ${naira(data.platformFees)}`, 14, summaryY + 18);

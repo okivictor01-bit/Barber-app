@@ -28,7 +28,7 @@ export default async function FinanceOverviewPage({
   const { from: monthFrom, to: monthTo } = getPeriodRange('month');
   const { data: monthTransactions } = await supabase
     .from('transactions')
-    .select('business_amount, platform_fee')
+    .select('amount, platform_fee')
     .eq('business_id', businessId)
     .eq('status', 'success')
     .gte('paid_at', monthFrom.toISOString())
@@ -42,10 +42,10 @@ export default async function FinanceOverviewPage({
     .gte('created_at', monthFrom.toISOString())
     .lte('created_at', monthTo.toISOString());
 
-  const moneyIn = (monthTransactions ?? []).reduce((s, t) => s + Number(t.business_amount), 0);
+  const moneyIn = (monthTransactions ?? []).reduce((s, t) => s + Number(t.amount), 0);
   const platformFees = (monthTransactions ?? []).reduce((s, t) => s + Number(t.platform_fee), 0);
   const moneyOut = (monthExpenses ?? []).reduce((s, e) => s + Number(e.amount), 0);
-  const profit = moneyIn - moneyOut;
+  const profit = moneyIn - platformFees - moneyOut;
 
   // Transaction report defaults to TODAY; searching by date shows past days.
   const isSearching = Boolean(fromParam || toParam);
@@ -71,7 +71,7 @@ export default async function FinanceOverviewPage({
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label={`Money In (your ${100 - Number(business?.commission_rate ?? 10)}%)`} value={moneyIn} tone="green" />
+        <StatCard label="Money In (total revenue)" value={moneyIn} tone="green" />
         <StatCard label="Money Out (expenses)" value={moneyOut} tone="red" />
         <StatCard label={profit >= 0 ? 'Profit' : 'Loss'} value={profit} tone={profit >= 0 ? 'green' : 'red'} />
         <StatCard label={`Platform Fees Paid (${business?.commission_rate ?? 10}%)`} value={platformFees} tone="neutral" />
