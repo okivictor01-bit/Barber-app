@@ -21,7 +21,14 @@ export default function ServicesList({ businessId, services }: { businessId: str
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ business_id: businessId, service_id: service.id }),
       });
-      const data = await res.json();
+
+      let data: any;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error('Something went wrong starting your payment. Please try again in a moment.');
+      }
+
       if (!res.ok || !data.status) {
         throw new Error(data.error ?? data.message ?? 'Could not start payment');
       }

@@ -82,19 +82,30 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: txErr.message }, { status: 500 });
   }
 
-  const paystackRes = await initializeTransaction({
-    email: user.email!,
-    amountNaira: amount,
-    reference,
-    callback_url: `${req.nextUrl.origin}/dashboard/customer?payment=callback`,
-    metadata: { business_id, customer_id: user.id, service_id: service_id ?? null },
-    // If the owner has completed payout setup, split automatically at the
-    // moment of charge: our platform_fee goes straight to the main account,
-    // the rest goes straight to their bank. If not set up yet, everything
-    // lands in the main account and payout stays manual for now.
-    subaccount: business.paystack_subaccount_code ?? undefined,
-    transactionChargeNaira: business.paystack_subaccount_code ? platform_fee : undefined,
-  });
+  let paystackRes;
+  try {
+    paystackRes = await initializeTransaction({
+      email: user.email!,
+      amountNaira: amount,
+      reference,
+      callback_url: `${req.nextUrl.origin}/dashboard/customer?payment=callback`,
+      metadata: { business_id, customer_id: user.id, service_id: service_id ?? null },
+      // If the owner has completed payout setup, split automatically at the
+      // moment of charge: our platform_fee goes straight to the main account,
+      // the rest goes straight to their bank. If not set up yet, everything
+      // lands in the main account and payout stays manual for now.
+      subaccount: business.paystack_subaccount_code ?? undefined,
+      transactionChargeNaira: business.paystack_subaccount_code ? platform_fee : undefined,
+    });
+  } catch (e: any) {
+    // Mark the pending transaction as failed rather than leaving it stuck,
+    // and surface a clear error instead of crashing with an empty response.
+    await admin.from('transactions').update({ status: 'failed' }).eq('paystack_reference', reference);
+    return NextResponse.json(
+      { error: e?.message ?? 'Could not start payment. Please try again or contact support.' },
+      { status: 502 }
+    );
+  }
 
   return NextResponse.json(paystackRes);
 }
