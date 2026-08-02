@@ -39,6 +39,16 @@ export async function toggleBusinessActive(businessId: string, isActive: boolean
   revalidatePath('/dashboard/super-admin/businesses');
 }
 
+export async function updateMessageStatus(messageId: string, status: 'new' | 'read' | 'resolved') {
+  const { supabase, profile } = await requireProfile();
+  if (profile.role !== 'super_admin') throw new Error('Only the super admin can manage support messages');
+
+  const { error } = await supabase.from('support_messages').update({ status }).eq('id', messageId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath('/dashboard/super-admin/messages');
+}
+
 // ---------- BUSINESS SETTINGS ----------
 
 export async function updateBusinessPrice(formData: FormData) {

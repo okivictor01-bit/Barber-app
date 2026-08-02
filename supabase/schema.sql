@@ -160,6 +160,18 @@ create table platform_settings (
 insert into platform_settings (id) values (1);
 
 -- =========================================================
+-- 7b. SUPPORT MESSAGES (public contact form submissions)
+-- =========================================================
+create table support_messages (
+  id uuid primary key default uuid_generate_v4(),
+  name text not null,
+  email text not null,
+  message text not null,
+  status text not null default 'new', -- new | read | resolved
+  created_at timestamptz not null default now()
+);
+
+-- =========================================================
 -- TRIGGERS
 -- =========================================================
 
@@ -246,6 +258,7 @@ alter table tickets enable row level security;
 alter table transactions enable row level security;
 alter table expenses enable row level security;
 alter table platform_settings enable row level security;
+alter table support_messages enable row level security;
 alter table services enable row level security;
 
 -- Helper: current user's role
@@ -368,3 +381,10 @@ create policy "super_admin manages settings" on platform_settings
 
 create policy "everyone reads settings" on platform_settings
   for select using (true);
+
+-- ---- SUPPORT MESSAGES ----
+create policy "anyone can submit a support message" on support_messages
+  for insert with check (true);
+
+create policy "super_admin manages support messages" on support_messages
+  for all using (my_role() = 'super_admin');

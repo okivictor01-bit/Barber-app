@@ -109,6 +109,11 @@ export default function RegisterPage() {
         <button type="submit" disabled={loading} className="btn-primary w-full">
           {loading ? 'Creating your business…' : 'Create business & continue'}
         </button>
+        <p className="text-xs text-center text-neutral-500">
+          By registering, you agree to our{' '}
+          <a href="/terms" target="_blank" className="text-brand-600 underline">Terms of Service</a> and{' '}
+          <a href="/privacy" target="_blank" className="text-brand-600 underline">Privacy Policy</a>.
+        </p>
       </form>
     </div>
   );

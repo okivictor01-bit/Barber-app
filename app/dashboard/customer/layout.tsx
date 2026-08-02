@@ -1,6 +1,9 @@
 import Sidebar from '@/components/Sidebar';
 
-const links = [{ href: '/dashboard/customer', label: 'My Tickets' }];
+const links = [
+  { href: '/dashboard/customer', label: 'My Tickets' },
+  { href: '/dashboard/customer/settings', label: 'Reset Password' },
+];
 
 export default function CustomerLayout({ children }: { children: React.ReactNode }) {
   return (
