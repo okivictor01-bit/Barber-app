@@ -1,1 +1,408 @@
-cfgg
+'use server';
+
+import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { revalidatePath } from 'next/cache';
+
+async function requireProfile() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+  if (!profile) throw new Error('Profile not found');
+
+  return { supabase, user, profile };
+}
+
+// ---------- SUPER ADMIN ----------
+
+export async function updateCommissionRate(businessId: string, formData: FormData) {
+  const { supabase, profile } = await requireProfile();
+  if (profile.role !== 'super_admin') throw new Error('Only the super admin can change commission rates');
+
+  const commission_rate = Number(formData.get('commission_rate'));
+  const { error } = await supabase.from('businesses').update({ commission_rate }).eq('id', businessId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath('/dashboard/super-admin/businesses');
+}
+
+export async function updatePlatformDefaultRate(formData: FormData) {
+  const { supabase, profile } = await requireProfile();
+  if (profile.role !== 'super_admin') throw new Error('Only the super admin can change the platform default rate');
+
+  const default_commission_rate = Number(formData.get('default_commission_rate'));
+  if (!(default_commission_rate >= 0)) throw new Error('Rate must be a positive number');
+
+  const { error } = await supabase
+    .from('platform_settings')
+    .update({ default_commission_rate })
+    .eq('id', true);
+  if (error) throw new Error(error.message);
+
+  revalidatePath('/dashboard/super-admin');
+}
+
+export async function toggleBusinessActive(businessId: string, isActive: boolean) {
+  const { supabase, profile } = await requireProfile();
+  if (profile.role !== 'super_admin') throw new Error('Only the super admin can suspend businesses');
+
+  const { error } = await supabase.from('businesses').update({ is_active: !isActive }).eq('id', businessId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath('/dashboard/super-admin/businesses');
+}
+
+export async function updateMessageStatus(messageId: string, status: 'new' | 'read' | 'resolved') {
+  const { supabase, profile } = await requireProfile();
+  if (profile.role !== 'super_admin') throw new Error('Only the super admin can manage support messages');
+
+  const { error } = await supabase.from('support_messages').update({ status }).eq('id', messageId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath('/dashboard/super-admin/messages');
+}
+
+// ---------- BUSINESS SETTINGS ----------
+
+export async function updateBusinessPrice(formData: FormData) {
+  const { supabase, profile } = await requireProfile();
+  if (profile.role !== 'admin') throw new Error('Only the business owner can update pricing');
+
+  const default_price = Number(formData.get('default_price'));
+  const { error } = await supabase
+    .from('businesses')
+    .update({ default_price })
+    .eq('id', profile.business_id);
+  if (error) throw new Error(error.message);
+
+  revalidatePath('/dashboard/admin');
+}
+
+export async function updateLoyaltyInterval(formData: FormData) {
+  const { supabase, profile } = await requireProfile();
+  if (profile.role !== 'admin') throw new Error('Only the business owner can update the loyalty program');
+
+  const loyalty_interval = Math.max(2, Number(formData.get('loyalty_interval'))); // guard against 0/1, which would give free tickets every visit
+  const { error } = await supabase
+    .from('businesses')
+    .update({ loyalty_interval })
+    .eq('id', profile.business_id);
+  if (error) throw new Error(error.message);
+
+  revalidatePath('/dashboard/admin');
+}
+
+export async function updateBusinessProfile(formData: FormData) {
+  const { supabase, profile } = await requireProfile();
+  if (profile.role !== 'admin') throw new Error('Only the business owner can update the business profile');
+
+  const address = String(formData.get('address') ?? '').trim();
+  const bio = String(formData.get('bio') ?? '').trim();
+
+  const { error } = await supabase
+    .from('businesses')
+    .update({ address: address || null, bio: bio || null })
+    .eq('id', profile.business_id);
+  if (error) throw new Error(error.message);
+
+  revalidatePath('/dashboard/admin');
+}
+
+// ---------- SERVICES (owner-managed add-ons, never loyalty-eligible) ----------
+
+export async function addService(formData: FormData) {
+  const { supabase, profile } = await requireProfile();
+  if (profile.role !== 'admin') throw new Error('Only the business owner can manage services');
+
+  const name = String(formData.get('name')).trim();
+  const price = Number(formData.get('price'));
+  if (!name) throw new Error('Service name is required');
+  if (!(price > 0)) throw new Error('Price must be greater than 0');
+
+  const { error } = await supabase.from('services').insert({
+    business_id: profile.business_id,
+    name,
+    price,
+  });
+  if (error) throw new Error(error.message);
+
+  revalidatePath('/dashboard/admin/services');
+}
+
+export async function updateService(serviceId: string, formData: FormData) {
+  const { supabase, profile } = await requireProfile();
+  if (profile.role !== 'admin') throw new Error('Only the business owner can manage services');
+
+  const name = String(formData.get('name')).trim();
+  const price = Number(formData.get('price'));
+  if (!name) throw new Error('Service name is required');
+  if (!(price > 0)) throw new Error('Price must be greater than 0');
+
+  const { error } = await supabase
+    .from('services')
+    .update({ name, price })
+    .eq('id', serviceId)
+    .eq('business_id', profile.business_id);
+  if (error) throw new Error(error.message);
+
+  revalidatePath('/dashboard/admin/services');
+}
+
+export async function toggleServiceActive(serviceId: string, isActive: boolean) {
+  const { supabase, profile } = await requireProfile();
+  if (profile.role !== 'admin') throw new Error('Only the business owner can manage services');
+
+  const { error } = await supabase
+    .from('services')
+    .update({ is_active: !isActive })
+    .eq('id', serviceId)
+    .eq('business_id', profile.business_id);
+  if (error) throw new Error(error.message);
+
+  revalidatePath('/dashboard/admin/services');
+}
+
+export async function onboardBarber(formData: FormData) {
+  const { profile } = await requireProfile();
+  if (profile.role !== 'admin') throw new Error('Only the business owner can onboard barbers');
+
+  const email = String(formData.get('email'));
+  const full_name = String(formData.get('full_name'));
+  const phone = String(formData.get('phone') ?? '');
+  const temp_password = String(formData.get('password'));
+
+  const admin = createAdminClient();
+
+  const { data: userRes, error: userErr } = await admin.auth.admin.createUser({
+    email,
+    password: temp_password,
+    email_confirm: true,
+  });
+  if (userErr || !userRes.user) throw new Error(userErr?.message ?? 'Failed to create barber account');
+
+  const { error: profileErr } = await admin.from('profiles').insert({
+    id: userRes.user.id,
+    role: 'barber',
+    full_name,
+    phone,
+    business_id: profile.business_id,
+    created_by: profile.id,
+  });
+  if (profileErr) {
+    await admin.auth.admin.deleteUser(userRes.user.id);
+    throw new Error(profileErr.message);
+  }
+
+  // Stamp the role onto the auth account — middleware reads this directly.
+  await admin.auth.admin.updateUserById(userRes.user.id, {
+    app_metadata: { role: 'barber', business_id: profile.business_id },
+  });
+
+  revalidatePath('/dashboard/admin/barbers');
+}
+
+export async function onboardManager(formData: FormData) {
+  const { profile } = await requireProfile();
+  if (profile.role !== 'admin') throw new Error('Only the business owner can onboard managers');
+
+  const email = String(formData.get('email'));
+  const full_name = String(formData.get('full_name'));
+  const phone = String(formData.get('phone') ?? '');
+  const temp_password = String(formData.get('password'));
+
+  const admin = createAdminClient();
+
+  const { data: userRes, error: userErr } = await admin.auth.admin.createUser({
+    email,
+    password: temp_password,
+    email_confirm: true,
+  });
+  if (userErr || !userRes.user) throw new Error(userErr?.message ?? 'Failed to create manager account');
+
+  const { error: profileErr } = await admin.from('profiles').insert({
+    id: userRes.user.id,
+    role: 'manager',
+    full_name,
+    phone,
+    business_id: profile.business_id,
+    created_by: profile.id,
+  });
+  if (profileErr) {
+    await admin.auth.admin.deleteUser(userRes.user.id);
+    throw new Error(profileErr.message);
+  }
+
+  await admin.auth.admin.updateUserById(userRes.user.id, {
+    app_metadata: { role: 'manager', business_id: profile.business_id },
+  });
+
+  revalidatePath('/dashboard/admin/managers');
+}
+
+export async function onboardCustomer(formData: FormData) {
+  const { profile } = await requireProfile();
+  if (!['admin', 'barber', 'manager'].includes(profile.role)) throw new Error('Not authorized');
+
+  const email = String(formData.get('email'));
+  const full_name = String(formData.get('full_name'));
+  const phone = String(formData.get('phone') ?? '');
+  const temp_password = String(formData.get('password'));
+
+  const admin = createAdminClient();
+
+  let customerId: string;
+
+  const { data: existingUser } = await admin.auth.admin.listUsers();
+  const found = existingUser.users.find((u) => u.email === email);
+
+  if (found) {
+    customerId = found.id;
+  } else {
+    const { data: userRes, error: userErr } = await admin.auth.admin.createUser({
+      email,
+      password: temp_password,
+      email_confirm: true,
+    });
+    if (userErr || !userRes.user) throw new Error(userErr?.message ?? 'Failed to create customer account');
+    customerId = userRes.user.id;
+
+    await admin.from('profiles').insert({
+      id: customerId,
+      role: 'customer',
+      full_name,
+      phone,
+      created_by: profile.id,
+    });
+
+    // Stamp the role onto the auth account — middleware reads this directly.
+    await admin.auth.admin.updateUserById(customerId, {
+      app_metadata: { role: 'customer' },
+    });
+  }
+
+  // Link to this business (loyalty tracking is per business_customers row)
+  await admin
+    .from('business_customers')
+    .upsert(
+      { business_id: profile.business_id, customer_id: customerId, onboarded_by: profile.id },
+      { onConflict: 'business_id,customer_id', ignoreDuplicates: true }
+    );
+
+  revalidatePath('/dashboard/admin/customers');
+  revalidatePath('/dashboard/barber/customers');
+}
+
+export async function removeStaffOrCustomer(userId: string) {
+  const { profile, supabase } = await requireProfile();
+  if (profile.role !== 'admin') throw new Error('Only the business owner can remove staff/customers');
+
+  // Deactivate rather than hard-delete to preserve transaction/ticket history
+  await supabase.from('profiles').update({ is_active: false }).eq('id', userId).eq('business_id', profile.business_id);
+  await supabase
+    .from('business_customers')
+    .delete()
+    .eq('customer_id', userId)
+    .eq('business_id', profile.business_id);
+
+  revalidatePath('/dashboard/admin/barbers');
+  revalidatePath('/dashboard/admin/customers');
+}
+
+// ---------- TICKETS ----------
+
+export async function submitTicket(ticketId: string) {
+  const { supabase, user } = await requireProfile();
+  const { error } = await supabase
+    .from('tickets')
+    .update({ submitted_at: new Date().toISOString() })
+    .eq('id', ticketId)
+    .eq('customer_id', user.id);
+  if (error) throw new Error(error.message);
+
+  revalidatePath('/dashboard/customer');
+  revalidatePath('/dashboard/admin/tickets');
+  revalidatePath('/dashboard/barber');
+  revalidatePath('/dashboard/manager/tickets');
+}
+
+export async function approveTicket(ticketId: string) {
+  const { supabase, profile } = await requireProfile();
+  if (!['admin', 'barber', 'manager'].includes(profile.role)) throw new Error('Not authorized');
+
+  const { error } = await supabase
+    .from('tickets')
+    .update({
+      status: 'approved',
+      barber_id: profile.role === 'barber' || profile.role === 'manager' ? profile.id : null,
+      approved_by: profile.id,
+      approved_at: new Date().toISOString(),
+    })
+    .eq('id', ticketId)
+    .eq('business_id', profile.business_id);
+  if (error) throw new Error(error.message);
+
+  revalidatePath('/dashboard/admin/tickets');
+  revalidatePath('/dashboard/barber/tickets');
+  revalidatePath('/dashboard/manager/tickets');
+}
+
+export async function completeTicket(ticketId: string) {
+  const { supabase, profile } = await requireProfile();
+  if (!['admin', 'barber', 'manager'].includes(profile.role)) throw new Error('Not authorized');
+
+  const { error } = await supabase
+    .from('tickets')
+    .update({ status: 'completed', completed_at: new Date().toISOString() })
+    .eq('id', ticketId)
+    .eq('business_id', profile.business_id);
+  if (error) throw new Error(error.message);
+
+  revalidatePath('/dashboard/admin/tickets');
+  revalidatePath('/dashboard/barber/tickets');
+  revalidatePath('/dashboard/manager/tickets');
+}
+
+// ---------- EXPENSES ----------
+
+export async function submitExpense(formData: FormData) {
+  const { supabase, profile } = await requireProfile();
+  if (!['admin', 'barber', 'manager'].includes(profile.role)) throw new Error('Not authorized');
+
+  const description = String(formData.get('description'));
+  const amount = Number(formData.get('amount'));
+  const category = String(formData.get('category') ?? 'general');
+
+  const { error } = await supabase.from('expenses').insert({
+    business_id: profile.business_id,
+    submitted_by: profile.id,
+    description,
+    amount,
+    category,
+    // Owner's own expenses can be auto-approved; barber's require owner approval
+    status: profile.role === 'admin' ? 'approved' : 'pending',
+    approved_by: profile.role === 'admin' ? profile.id : null,
+    approved_at: profile.role === 'admin' ? new Date().toISOString() : null,
+  });
+  if (error) throw new Error(error.message);
+
+  revalidatePath('/dashboard/admin/expenses');
+  revalidatePath('/dashboard/barber/expenses');
+  revalidatePath('/dashboard/manager/expenses');
+}
+
+export async function reviewExpense(expenseId: string, decision: 'approved' | 'rejected') {
+  const { supabase, profile } = await requireProfile();
+  if (profile.role !== 'admin') throw new Error('Only the business owner can approve expenses');
+
+  const { error } = await supabase
+    .from('expenses')
+    .update({ status: decision, approved_by: profile.id, approved_at: new Date().toISOString() })
+    .eq('id', expenseId)
+    .eq('business_id', profile.business_id);
+  if (error) throw new Error(error.message);
+
+  revalidatePath('/dashboard/admin/expenses');
+}
