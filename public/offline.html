@@ -1,1 +1,42 @@
-jdjjdd
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>You're offline — BarbFlow</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #fafafa;
+      color: #171717;
+      text-align: center;
+      padding: 24px;
+    }
+    img { height: 64px; margin-bottom: 16px; }
+    h1 { font-size: 1.25rem; margin: 0 0 8px; }
+    p { color: #737373; max-width: 320px; margin: 0; }
+    button {
+      margin-top: 20px;
+      background: #c2410c;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <img src="/logo.png" alt="BarbFlow" />
+  <h1>You're offline</h1>
+  <p>Check your connection and try again. Your dashboard needs a live connection to show up-to-date data.</p>
+  <button onclick="window.location.reload()">Retry</button>
+</body>
+</html>
