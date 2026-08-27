@@ -1,4 +1,10 @@
-node_modules
-dist
+node_modules/
+.next/
+.vercel/
+.open-next/
+.wrangler/
+cloudflare-env.d.ts
 .env
 .env.local
+.wrangler/
+*.log
